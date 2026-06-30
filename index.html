@@ -140,6 +140,10 @@
   button.minus:hover{
     opacity:.5;
   }
+  button:disabled{
+    opacity:.3;
+    cursor:not-allowed;
+  }
   .footer{
     margin-top:48px;
     display:flex;
@@ -246,7 +250,7 @@
 
   <div class="footer">
     <button class="reset-btn" id="resetBtn">Reset all scores</button>
-    <div class="status" id="status"></div>
+    <div class="status" id="status">connecting…</div>
   </div>
 
   <div class="overlay" id="overlay">
@@ -260,19 +264,42 @@
     </div>
   </div>
 
-<script>
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// ====== PASTE YOUR FIREBASE CONFIG HERE ======
+const firebaseConfig = {
+  apiKey: "AIzaSyAzlNZFcLXaUo4dob1uUOLSdNQJYKWClgg",
+  authDomain: "match-tracker-14f1a.firebaseapp.com",
+  databaseURL: "https://match-tracker-14f1a-default-rtdb.firebaseio.com",
+  projectId: "match-tracker-14f1a",
+  storageBucket: "match-tracker-14f1a.firebasestorage.app",
+  messagingSenderId: "527079787210",
+  appId: "1:527079787210:web:87c25d72b86b60f9ea0233"
+};
+// ==============================================
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const stateRef = ref(db, "matchTracker");
+
 const GAMES = [
   { key: 'fifa', label: 'FIFA' },
   { key: 'pes', label: 'PES' }
 ];
 
-let state = {
+const defaultState = {
   names: { p1: 'Player 1', p2: 'Player 2' },
   scores: {
     fifa: { p1: 0, p2: 0 },
     pes: { p1: 0, p2: 0 }
   }
 };
+
+let state = JSON.parse(JSON.stringify(defaultState));
+let ready = false;
 
 const boardsEl = document.getElementById('boards');
 const statusEl = document.getElementById('status');
@@ -292,11 +319,11 @@ function render(){
       <div class="players">
         ${['p1','p2'].map(p => `
           <div class="player">
-            <input class="player-name" data-player="${p}" value="${state.names[p]}" maxlength="16" />
+            <input class="player-name" data-player="${p}" value="${state.names[p]}" maxlength="16" ${ready ? '' : 'disabled'} />
             <div class="score">${state.scores[game.key][p]}</div>
             <div class="controls">
-              <button class="win" data-game="${game.key}" data-player="${p}" data-action="add">+1 win</button>
-              <button class="minus" data-game="${game.key}" data-player="${p}" data-action="sub">−</button>
+              <button class="win" data-game="${game.key}" data-player="${p}" data-action="add" ${ready ? '' : 'disabled'}>+1 win</button>
+              <button class="minus" data-game="${game.key}" data-player="${p}" data-action="sub" ${ready ? '' : 'disabled'}>−</button>
             </div>
           </div>
         `).join('')}
@@ -311,7 +338,6 @@ function render(){
       if(a === 'add') state.scores[g][p]++;
       else state.scores[g][p] = Math.max(0, state.scores[g][p]-1);
       save();
-      render();
     });
   });
 
@@ -319,59 +345,57 @@ function render(){
     inp.addEventListener('change', () => {
       state.names[inp.dataset.player] = inp.value.trim() || (inp.dataset.player === 'p1' ? 'Player 1' : 'Player 2');
       save();
-      render();
     });
   });
 }
 
-async function load(){
-  try{
-    const res = await window.storage.get('match-tracker-state', true);
-    if(res && res.value){
-      const parsed = JSON.parse(res.value);
-      state = { ...state, ...parsed,
-        scores: { fifa: { ...state.scores.fifa, ...(parsed.scores?.fifa||{}) },
-                  pes: { ...state.scores.pes, ...(parsed.scores?.pes||{}) } },
-        names: { ...state.names, ...(parsed.names||{}) }
-      };
-    }
-  }catch(e){
-    // no saved state yet
-  }
-  render();
-}
-
-async function save(){
+function save(){
   statusEl.textContent = 'saving';
-  try{
-    await window.storage.set('match-tracker-state', JSON.stringify(state), true);
-    statusEl.textContent = 'saved';
-    setTimeout(()=>{ if(statusEl.textContent==='saved') statusEl.textContent=''; }, 1200);
-  }catch(e){
-    statusEl.textContent = 'save failed';
-  }
+  set(stateRef, state)
+    .then(() => {
+      statusEl.textContent = 'saved';
+      setTimeout(()=>{ if(statusEl.textContent==='saved') statusEl.textContent=''; }, 1200);
+    })
+    .catch(() => {
+      statusEl.textContent = 'save failed — check connection';
+    });
 }
 
-function openModal(){
-  overlay.classList.add('open');
-}
-function closeModal(){
-  overlay.classList.remove('open');
-}
+// Live sync: any change in the database (from you or your friend) updates the page
+onValue(stateRef, (snapshot) => {
+  const data = snapshot.val();
+  if(data){
+    state = {
+      names: { ...defaultState.names, ...(data.names||{}) },
+      scores: {
+        fifa: { ...defaultState.scores.fifa, ...(data.scores?.fifa||{}) },
+        pes: { ...defaultState.scores.pes, ...(data.scores?.pes||{}) }
+      }
+    };
+  } else {
+    // nothing in the database yet — seed it
+    set(stateRef, defaultState);
+  }
+  ready = true;
+  if(statusEl.textContent === 'connecting…') statusEl.textContent = '';
+  render();
+}, (error) => {
+  statusEl.textContent = 'connection failed — check Firebase config';
+});
+
+function openModal(){ overlay.classList.add('open'); }
+function closeModal(){ overlay.classList.remove('open'); }
 
 document.getElementById('resetBtn').addEventListener('click', openModal);
 document.getElementById('cancelBtn').addEventListener('click', closeModal);
-overlay.addEventListener('click', (e) => {
-  if(e.target === overlay) closeModal();
-});
+overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
 document.getElementById('confirmBtn').addEventListener('click', () => {
   state.scores = { fifa:{p1:0,p2:0}, pes:{p1:0,p2:0} };
   save();
-  render();
   closeModal();
 });
 
-load();
+render();
 </script>
 
 </body>
