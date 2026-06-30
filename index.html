@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match Tracker</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --ink:#000000;
+    --line:#000000;
+    --muted:#7a7a7a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Futura', 'Century Gothic', 'Avenir Next', sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:56px 20px 80px;
+  }
+  h1{
+    font-size:13px;
+    letter-spacing:8px;
+    text-transform:uppercase;
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .sub{
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:3px;
+    text-transform:uppercase;
+    margin-bottom:56px;
+  }
+  .boards{
+    display:flex;
+    gap:1px;
+    background:var(--line);
+    width:100%;
+    max-width:760px;
+    border:1px solid var(--line);
+  }
+  .board{
+    background:var(--bg);
+    flex:1;
+    min-width:0;
+  }
+  .board-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:18px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .board-title{
+    font-size:12px;
+    letter-spacing:5px;
+    text-transform:uppercase;
+    font-weight:600;
+  }
+  .board-total{
+    font-size:10px;
+    color:var(--muted);
+    letter-spacing:1px;
+    text-transform:uppercase;
+  }
+  .players{
+    display:flex;
+  }
+  .player{
+    flex:1;
+    padding:36px 14px 28px;
+    text-align:center;
+    position:relative;
+  }
+  .player:first-child{
+    border-right:1px solid var(--line);
+  }
+  .player-name{
+    font-size:10px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:16px;
+    background:transparent;
+    border:none;
+    border-bottom:1px solid transparent;
+    text-align:center;
+    width:100%;
+    font-family:inherit;
+    outline:none;
+    padding-bottom:4px;
+  }
+  .player-name:focus{
+    color:var(--ink);
+    border-bottom:1px solid var(--ink);
+  }
+  .score{
+    font-size:56px;
+    font-weight:600;
+    color:var(--ink);
+    line-height:1;
+    margin-bottom:20px;
+    font-variant-numeric:tabular-nums;
+  }
+  .controls{
+    display:flex;
+    gap:6px;
+    justify-content:center;
+  }
+  button.win{
+    background:var(--ink);
+    border:1px solid var(--ink);
+    color:var(--bg);
+    padding:9px 16px;
+    font-family:inherit;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:opacity .15s ease;
+  }
+  button.win:hover{
+    opacity:.7;
+  }
+  button.minus{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--ink);
+    width:32px;
+    font-family:inherit;
+    font-size:13px;
+    cursor:pointer;
+    transition:opacity .15s ease;
+  }
+  button.minus:hover{
+    opacity:.5;
+  }
+  .footer{
+    margin-top:48px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+  }
+  .reset-btn{
+    background:transparent;
+    border:1px solid var(--ink);
+    color:var(--ink);
+    padding:10px 22px;
+    font-family:inherit;
+    font-size:10px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .reset-btn:hover{
+    background:var(--ink);
+    color:var(--bg);
+  }
+  .status{
+    font-size:9px;
+    color:var(--muted);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    min-height:12px;
+  }
+
+  /* Confirm modal */
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(255,255,255,0.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+  }
+  .overlay.open{
+    display:flex;
+  }
+  .modal{
+    background:var(--bg);
+    border:1px solid var(--ink);
+    max-width:320px;
+    width:90%;
+    padding:32px 28px;
+    text-align:center;
+  }
+  .modal-title{
+    font-size:11px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    font-weight:600;
+    margin-bottom:14px;
+  }
+  .modal-text{
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.6;
+    margin-bottom:26px;
+  }
+  .modal-actions{
+    display:flex;
+    gap:1px;
+    border:1px solid var(--ink);
+  }
+  .modal-actions button{
+    flex:1;
+    background:var(--bg);
+    border:none;
+    padding:12px 0;
+    font-family:inherit;
+    font-size:10px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .modal-actions button + button{
+    border-left:1px solid var(--ink);
+  }
+  .modal-actions .confirm{
+    background:var(--ink);
+    color:var(--bg);
+  }
+  .modal-actions button:hover{
+    opacity:.7;
+  }
+
+  @media (max-width:540px){
+    .boards{flex-direction:column;}
+    .board + .board{border-top:1px solid var(--line);}
+  }
+</style>
+</head>
+<body>
+
+  <h1>Match Tracker</h1>
+  <div class="sub">FIFA &amp; PES &middot; head to head</div>
+
+  <div class="boards" id="boards"></div>
+
+  <div class="footer">
+    <button class="reset-btn" id="resetBtn">Reset all scores</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="modal-title">Reset all scores?</div>
+      <div class="modal-text">This sets every score on both boards back to zero. Player names are kept. This cannot be undone.</div>
+      <div class="modal-actions">
+        <button id="cancelBtn">Cancel</button>
+        <button class="confirm" id="confirmBtn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const GAMES = [
+  { key: 'fifa', label: 'FIFA' },
+  { key: 'pes', label: 'PES' }
+];
+
+let state = {
+  names: { p1: 'Player 1', p2: 'Player 2' },
+  scores: {
+    fifa: { p1: 0, p2: 0 },
+    pes: { p1: 0, p2: 0 }
+  }
+};
+
+const boardsEl = document.getElementById('boards');
+const statusEl = document.getElementById('status');
+const overlay = document.getElementById('overlay');
+
+function render(){
+  boardsEl.innerHTML = '';
+  GAMES.forEach(game => {
+    const total = state.scores[game.key].p1 + state.scores[game.key].p2;
+    const board = document.createElement('div');
+    board.className = 'board';
+    board.innerHTML = `
+      <div class="board-header">
+        <div class="board-title">${game.label}</div>
+        <div class="board-total">${total} played</div>
+      </div>
+      <div class="players">
+        ${['p1','p2'].map(p => `
+          <div class="player">
+            <input class="player-name" data-player="${p}" value="${state.names[p]}" maxlength="16" />
+            <div class="score">${state.scores[game.key][p]}</div>
+            <div class="controls">
+              <button class="win" data-game="${game.key}" data-player="${p}" data-action="add">+1 win</button>
+              <button class="minus" data-game="${game.key}" data-player="${p}" data-action="sub">−</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    boardsEl.appendChild(board);
+  });
+
+  boardsEl.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = btn.dataset.game, p = btn.dataset.player, a = btn.dataset.action;
+      if(a === 'add') state.scores[g][p]++;
+      else state.scores[g][p] = Math.max(0, state.scores[g][p]-1);
+      save();
+      render();
+    });
+  });
+
+  boardsEl.querySelectorAll('.player-name').forEach(inp => {
+    inp.addEventListener('change', () => {
+      state.names[inp.dataset.player] = inp.value.trim() || (inp.dataset.player === 'p1' ? 'Player 1' : 'Player 2');
+      save();
+      render();
+    });
+  });
+}
+
+async function load(){
+  try{
+    const res = await window.storage.get('match-tracker-state', true);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      state = { ...state, ...parsed,
+        scores: { fifa: { ...state.scores.fifa, ...(parsed.scores?.fifa||{}) },
+                  pes: { ...state.scores.pes, ...(parsed.scores?.pes||{}) } },
+        names: { ...state.names, ...(parsed.names||{}) }
+      };
+    }
+  }catch(e){
+    // no saved state yet
+  }
+  render();
+}
+
+async function save(){
+  statusEl.textContent = 'saving';
+  try{
+    await window.storage.set('match-tracker-state', JSON.stringify(state), true);
+    statusEl.textContent = 'saved';
+    setTimeout(()=>{ if(statusEl.textContent==='saved') statusEl.textContent=''; }, 1200);
+  }catch(e){
+    statusEl.textContent = 'save failed';
+  }
+}
+
+function openModal(){
+  overlay.classList.add('open');
+}
+function closeModal(){
+  overlay.classList.remove('open');
+}
+
+document.getElementById('resetBtn').addEventListener('click', openModal);
+document.getElementById('cancelBtn').addEventListener('click', closeModal);
+overlay.addEventListener('click', (e) => {
+  if(e.target === overlay) closeModal();
+});
+document.getElementById('confirmBtn').addEventListener('click', () => {
+  state.scores = { fifa:{p1:0,p2:0}, pes:{p1:0,p2:0} };
+  save();
+  render();
+  closeModal();
+});
+
+load();
+</script>
+
+</body>
+</html>
